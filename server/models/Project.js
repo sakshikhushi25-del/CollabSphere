@@ -28,11 +28,20 @@ const projectSchema = new mongoose.Schema({
     members: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
-    }]
+    }],
+    isPublic: {
+        type: Boolean,
+        default: false
+    },
+    shareToken: {
+        type: String,
+        unique: true,
+        sparse: true
+    }
 },
-{
-    timestamps: true
-});
+    {
+        timestamps: true
+    });
 const Project = mongoose.model("Project", projectSchema);
 
 export default Project;

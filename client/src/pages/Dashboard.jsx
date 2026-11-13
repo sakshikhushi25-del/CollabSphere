@@ -1,188 +1,308 @@
-import { useState, useEffect } from 'react';
-import Navbar from '../components/Navbar';
-import ProjectCard from '../components/ProjectCard';
-import { useNavigate } from 'react-router-dom';
-import "../App.css";
-import { getProjects, createProject, deleteProject, updateProject } from '../services/api';
+
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { getProjects } from "../services/api";
 
 function Dashboard() {
+
     const navigate = useNavigate();
+
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [searchText, setSearchText] = useState("");
-    const [showForm, setShowForm] = useState(false);
-    const [newProject, setNewProject] = useState({
-        title: "",
-        description: "",
-        status: "Not Started"
-    });
-    const [editingProject, setEditingProject] = useState(null);
-    const [searchStatus, setSearchStatus] = useState("All");
+
+    const currentUser = JSON.parse(
+        localStorage.getItem("user") || "null"
+    );
 
     useEffect(() => {
-        async function loadProjects() {
+
+        async function loadDashboard() {
+
             try {
-                setLoading(true);
+
                 setError("");
 
                 const data = await getProjects();
-                setProjects(data.projects);
-            } catch (error) {
-                setError(error.message);
+
+                setProjects(data.projects || []);
+
+            } catch (err) {
+
+                setError(err.message);
+
             } finally {
+
                 setLoading(false);
+
             }
+
         }
-        loadProjects();
+
+        loadDashboard();
+
     }, []);
 
-    function handleChange(e) {
-        const { name, value } = e.target;
-        setNewProject({
-            ...newProject,
-            [name]: value
-        });
-    }
+    const totalProjects = projects.length;
 
-    async function handleCreateProject(e) {
-        e.preventDefault();
+    const completedProjects = projects.filter(project =>
+        ["completed", "complete"].includes(
+            (project.status || "").toLowerCase()
+        )
+    ).length;
 
-        setError("");
+    const notStartedProjects = projects.filter(project =>
+        ["not started", "pending"].includes(
+            (project.status || "").toLowerCase()
+        )
+    ).length;
 
-        const title = newProject.title.trim();
-        const description = newProject.description.trim();
+    const inProgressProjects = projects.filter(project =>
+        ["in progress", "active"].includes(
+            (project.status || "").toLowerCase()
+        )
+    ).length;
 
-        if(title.length < 5) {
-            setError("Project title must be at least 5 characters.");
-            return;
-        }
+    // Recent projects
+    const recentProjects = [...projects]
+        .sort((a, b) =>
+            new Date(b.updatedAt || b.createdAt) -
+            new Date(a.updatedAt || a.createdAt)
+        )
+        .slice(0, 3);
 
-        if(description.length < 30) {
-            setError("Description must be at least 30 characters.");
-            return;
-        }
-
-        try {
-            const projectData = ({
-                title,
-                description,
-                status: newProject.status
-            });
-            if(editingProject) {
-                const data = await updateProject(
-                    editingProject._id,
-                    projectData
-                );
-                setProjects((previousProjects) => 
-                    previousProjects.map((project) =>
-                        project._id === editingProject._id ? data.project : project
-                    )
-                )
-            } else {
-                const data = await createProject(projectData);
-                setProjects((previousProjects) => [
-                    data.project,
-                    ...previousProjects
-                ]);
-            }
-            setNewProject({
-                title: "",
-                description: "",
-                status: "Not Started"
-            });
-            setEditingProject(null);
-            setShowForm(false);
-        } catch(error) {
-            setError(error.message);
-        }
-    }
-
-    async function handleDeleteProject(projectId) {
-        try {
-            await deleteProject(projectId);
-
-            setProjects((previousProjects) => 
-                previousProjects.filter((project) => project._id !== projectId)
-            )
-        } catch(error) {
-            setError(error.message);
-        }
-    }
-
-    function handleEditProject(project) {
-        setEditingProject(project);
-
-        setNewProject({
-            title: project.title,
-            description: project.description,
-            status: project.status
-        });
-        setShowForm(true);
-    }
-
-    const filteredProjects = projects.filter((project) => {
-        const matchesSearch = project.title.toLowerCase().includes(searchText.toLowerCase());
-        const matchesStatus = searchStatus === "All" || project.status === searchStatus;
-        return matchesSearch && matchesStatus;
-    });
     return (
-        <div className='dashboard'>
-            <Navbar onSearch={setSearchText} searchStatus={searchStatus} onStatusChange={setSearchStatus} />
-            <main className='dashboard-content'>
-                <div className='dashboard-heading'>
-                    <div>
-                        <h2>My Project</h2>
-                        <p>Manage all your development projects in one place.</p>
-                    </div>
-                    <button className='create-project-btn' onClick={() => setShowForm(!showForm)}>{showForm ? "close Form" : "+ Create New Project"}</button>
+
+        <main className="dashboard-page">
+
+            <header className="dashboard-header">
+
+                <div>
+                    <span>Workspace</span>
+                    <span className="header-divider">/</span>
+                    <strong>Welcome back, {currentUser?.name || "User"}</strong>
                 </div>
-                {showForm && (
-                    <form className='project-form' onSubmit={handleCreateProject}>
-                        <h2>{editingProject ? "Edit Project" : "Create a New Project"}</h2>
-                        <label htmlFor="title">Project Title</label>
-                        <input type="text" id='title' name='title' placeholder='Enter project title' value={newProject.title} onChange={handleChange} required maxLength={100} />
 
-                        <label htmlFor="description">Project Description</label>
-                        <textarea type="text" id='description' name='description' placeholder='Describe about you project' value={newProject.description} onChange={handleChange} required maxLength={1000} />
+                <div className="dashboard-avatar">
+                    {currentUser?.name?.charAt(0)?.toUpperCase() || "U"}
+                </div>
 
-                        <label htmlFor="status">Project Status</label>
-                        <select name="status" id="status" value={newProject.status} onChange={handleChange}>
-                            <option value="Not Started">Not Started</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Completed">Completed</option>
-                        </select>
+            </header>
 
-                        <div className='form-actions'>
-                            <button type='submit'>{editingProject ? "Update Project": "Create Project"}</button>
+            <div className="dashboard-container">
 
-                            <button type='button' onClick={() => {setShowForm(false); setEditingProject(null); setNewProject({
-                                title: "",
-                                description: "",
-                                status: "Not Started"
-                            })}}>Cancel</button>
-                        </div>
-                    </form>
-                )}
+                <section className="dashboard-welcome">
 
-                {loading && <p>Loading projects...</p>}
+                    <div>
 
-                {error && (<p className='auth-error'>Could not load projects: {error}</p>)}
+                        <p className="dashboard-eyebrow">
+                            COLLABSPHERE WORKSPACE
+                        </p>
 
-                {!loading && !error && (
-                    <div className='project-list'>
-                        {filteredProjects.map((project) => (
-                            <ProjectCard key={project._id} title={project.title} description={project.description} status={project.status} onView={() => navigate(`/projects/${project._id}`)} onEdit={() => handleEditProject(project)} onDelete={() => handleDeleteProject(project._id)} />
-                        ))}
+                        <h1>
+                            Welcome back,<br />
+                            {currentUser?.name || "User"}
+                        </h1>
+
+                        <p>
+                            Here's what's happening across your
+                            collaboration workspace.
+                        </p>
+
                     </div>
+
+                    <button
+                        onClick={() => navigate("/projects")}
+                    >
+                        + New Project
+                    </button>
+
+                </section>
+
+                {error && (
+                    <p className="error-message">{error}</p>
                 )}
 
-                {!loading && !error && filteredProjects.length === 0 && (<p className='no-projects'>
-                    {projects.length === 0 ? "No projects yet. Create your first project!" : "No projects match your search or selected status."}
-                </p>)}
-            </main>
-        </div>
-    )
+                {/* Statistics */}
+
+                <section className="dashboard-stats">
+
+                    <div className="stat-card">
+
+                        <div className="stat-icon">▱</div>
+
+                        <div>
+                            <p>Total Projects</p>
+                            <h2>
+                                {loading ? "..." : totalProjects}
+                            </h2>
+                        </div>
+
+                    </div>
+
+                    <div className="stat-card">
+
+                        <div className="stat-icon">♧</div>
+
+                        <div>
+                            <p>In Progress</p>
+                            <h2>
+                                {loading ? "..." : inProgressProjects}
+                            </h2>
+                        </div>
+
+                    </div>
+
+                    <div className="stat-card">
+
+                        <div className="stat-icon">✓</div>
+
+                        <div>
+                            <p>Completed</p>
+                            <h2>
+                                {loading ? "..." : completedProjects}
+                            </h2>
+                        </div>
+
+                    </div>
+
+                    <div className="stat-card">
+
+                        <div className="stat-icon">◷</div>
+
+                        <div>
+                            <p>Not Started</p>
+                            <h2>
+                                {loading ? "..." : notStartedProjects}
+                            </h2>
+                        </div>
+
+                    </div>
+
+                </section>
+
+                {/* Quick Actions */}
+
+                <section className="quick-actions">
+
+                    <div>
+                        <h3>Quick Actions</h3>
+
+                        <p>
+                            Jump into your team's work.
+                        </p>
+                    </div>
+
+                    <div className="quick-action-buttons">
+
+                        <button
+                            onClick={() => navigate("/projects")}
+                        >
+                            + Create Project
+                        </button>
+
+                        <button
+                            className="secondary-button"
+                            onClick={() => navigate("/projects")}
+                        >
+                            ▱ View Projects
+                        </button>
+
+                    </div>
+
+                </section>
+
+                {/* Recent Projects */}
+
+                <section className="recent-projects">
+
+                    <div className="section-heading">
+
+                        <div>
+                            <h2>Recent Projects</h2>
+
+                            <p>
+                                Your recently updated projects.
+                            </p>
+                        </div>
+
+                        <Link to="/projects">
+                            View All Projects →
+                        </Link>
+
+                    </div>
+
+                    {loading ? (
+
+                        <p>Loading projects...</p>
+
+                    ) : recentProjects.length === 0 ? (
+
+                        <div className="empty-projects">
+
+                            <h3>No projects yet</h3>
+
+                            <p>
+                                Create your first project to get started.
+                            </p>
+
+                            <button
+                                onClick={() => navigate("/projects")}
+                            >
+                                Create Your First Project
+                            </button>
+
+                        </div>
+
+                    ) : (
+
+                        <div className="recent-projects-grid">
+
+                            {recentProjects.map(project => (
+
+                                <div
+                                    className="recent-project-card"
+                                    key={project._id}
+                                >
+
+                                    <h3>{project.title}</h3>
+
+                                    <p>
+                                        {project.description}
+                                    </p>
+
+                                    <div className="recent-project-footer">
+
+                                        <span>
+                                            {project.status || "Active"}
+                                        </span>
+
+                                        <button
+                                            onClick={() =>
+                                                navigate(`/projects/${project._id}`)
+                                            }
+                                        >
+                                            View Details
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            ))}
+
+                        </div>
+
+                    )}
+
+                </section>
+
+            </div>
+
+        </main>
+
+    );
+
 }
 
 export default Dashboard;
